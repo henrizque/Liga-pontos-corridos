@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Liga de Pontos Corridos — 30 Rodadas Fixas</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --muted: #1f2937;
+      --ink: #e5e7eb;
+      --accent: #7c3aed;
+      --accent-2: #22c55e;
+      --danger: #ef4444;
+      --warn: #f59e0b;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: linear-gradient(120deg, #0b1023, #0f172a 30%, #0b1023 70%);
+      color: var(--ink);
+    }
+    .container { max-width: 1200px; margin: 32px auto; padding: 0 20px; }
+    h1 { font-size: 28px; margin-bottom: 12px; text-align: center; }
+    h2 { margin-bottom: 16px; }
+    .card { background: linear-gradient(180deg,var(--panel),#0b1227); border:1px solid rgba(255,255,255,.06); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; border-radius:14px; overflow:hidden; }
+    thead th { font-size:12px; opacity:.8; text-align:center; background:rgba(255,255,255,.06); }
+    tbody td, thead th { padding:10px 8px; border-bottom:1px solid rgba(255,255,255,.06); }
+    tbody td { text-align:center; }
+    tbody td.name { text-align:left; }
+    .grid { display: grid; gap: 16px; }
+    @media(min-width:900px){ .grid { grid-template-columns: 1.1fr .9fr; } }
+    .teams-list { display: grid; gap: 10px; }
+    .team-item { display: grid; grid-template-columns:32px 1fr; gap: 10px; align-items: center; padding: 8px; border:1px solid rgba(255,255,255,.08); border-radius:12px; background: rgba(255,255,255,.02); }
+    .handle { text-align: center; opacity:.7; cursor: ${true?'grab':'default'}; }
+    .schedule { display: grid; gap: 14px; }
+    .round { border:1px solid rgba(255,255,255,.08); border-radius:14px; overflow:hidden; }
+    .round > summary { background: rgba(255,255,255,.04); padding:10px 14px; font-weight:700; cursor: pointer; }
+    .round .content { padding:12px; display:grid; gap:10px; background: rgba(0,0,0,.15); }
+    .match { display: grid; grid-template-columns:1fr 40px 1fr 70px 70px 32px; gap:8px; align-items:center; }
+    .input { width: 100%; padding: 10px 12px; border-radius: 10px; border:1px solid rgba(255,255,255,.12); background:#0b1227; color: var(--ink); }
+    .input[readonly] { background:#0b1227; color:#999; border:1px solid rgba(255,255,255,.06); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card tabela">
+      <h2>Classificação</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th style="text-align:left">Time</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th><th>P</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Times</h2>
+        <div id="teams" class="teams-list"></div>
+      </section>
+
+      <section class="card">
+        <h2>Rodadas (30 rodadas fixas)</h2>
+        <div id="schedule" class="schedule"></div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const uid = ()=>Math.random().toString(36).slice(2,9);
+    const isAdmin = true; // Altere para false para apenas visualização
+    const State = {teams:[{id:uid(),name:'Time A'},{id:uid(),name:'Time B'},{id:uid(),name:'Time C'},{id:uid(),name:'Time D'}],rounds:30,matches:[]};
+    const els={teams:document.getElementById('teams'),schedule:document.getElementById('schedule'),tableBody:document.getElementById('tableBody')};
+
+    const renderTeams=()=>{
+      els.teams.innerHTML='';
+      State.teams.forEach(t=>{
+        const d=document.createElement('div');
+        d.className='team-item';
+        const input=document.createElement('input');
+        input.className='input';
+        input.value=t.name;
+        if(!isAdmin) input.setAttribute('readonly','true');
+        input.addEventListener('input',()=>{ t.name=input.value; renderTable(); renderSchedule(); });
+        d.innerHTML=`<div class='handle'>☰</div>`;
+        d.appendChild(input);
+        els.teams.appendChild(d);
+      });
+    };
+
+    const generateMatches=()=>{
+      const ids = State.teams.map(t=>t.id);
+      const baseRounds=[[ids[0],ids[1]],[ids[2],ids[3]],[ids[0],ids[2]],[ids[1],ids[3]],[ids[0],ids[3]],[ids[1],ids[2]]];
+      State.matches=[];
+      for(let cycle=0;cycle<10;cycle++){
+        for(let i=0;i<baseRounds.length;i+=2){
+          const r=(cycle*3)+(i/2)+1;
+          State.matches.push({id:uid(),round:r,homeId:baseRounds[i][0],awayId:baseRounds[i][1],homeG:null,awayG:null});
+          State.matches.push({id:uid(),round:r,homeId:baseRounds[i+1][0],awayId:baseRounds[i+1][1],homeG:null,awayG:null});
+        }
+      }
+    };
+
+    const renderSchedule=()=>{
+      els.schedule.innerHTML='';
+      for(let r=1;r<=State.rounds;r++){
+        const det=document.createElement('details');det.className='round';det.open=true;det.innerHTML=`<summary>Rodada ${r}</summary>`;
+        const cont=document.createElement('div');cont.className='content';
+        State.matches.filter(m=>m.round===r).forEach(m=>{
+          const row=document.createElement('div');row.className='match';
+          const homeSel=document.createElement('select');homeSel.className='home';
+          const awaySel=document.createElement('select');awaySel.className='away';
+          State.teams.forEach(t=>{homeSel.innerHTML+=`<option value='${t.id}' ${t.id===m.homeId?'selected':''}>${t.name}</option>`;awaySel.innerHTML+=`<option value='${t.id}' ${t.id===m.awayId?'selected':''}>${t.name}</option>`});
+          if(!isAdmin){homeSel.setAttribute('disabled','true');awaySel.setAttribute('disabled','true');}
+          const hG=document.createElement('input');hG.type='number';hG.min=0;hG.className='input hG';hG.value=m.homeG??'';
+          const aG=document.createElement('input');aG.type='number';aG.min=0;aG.className='input aG';aG.value=m.awayG??'';
+          if(!isAdmin){hG.setAttribute('readonly','true');aG.setAttribute('readonly','true');}
+          [homeSel,awaySel,hG,aG].forEach(el=>el.addEventListener('input',()=>{ if(isAdmin){ m.homeId=homeSel.value;m.awayId=awaySel.value;m.homeG=parseInt(hG.value)||0;m.awayG=parseInt(aG.value)||0; renderTable(); }}));
+          row.appendChild(homeSel); row.innerHTML+=' <div>vs</div> '; row.appendChild(awaySel); row.appendChild(hG); row.appendChild(aG);
+          cont.appendChild(row);
+        });
+        det.appendChild(cont); els.schedule.appendChild(det);
+      }
+    };
+
+    const computeTable=()=>{
+      const stats=new Map();
+      State.teams.forEach(t=>stats.set(t.id,{id:t.id,name:t.name,J:0,V:0,E:0,D:0,GP:0,GC:0,SG:0,P:0}));
+      State.matches.forEach(m=>{
+        const H=stats.get(m.homeId),A=stats.get(m.awayId);
+        if(!H||!A) return;
+        if(m.homeG != null && m.awayG != null){
+          H.J++;A.J++;
+          H.GP+=m.homeG; H.GC+=m.awayG;
+          A.GP+=m.awayG; A.GC+=m.homeG;
+          if(m.homeG>m.awayG){H.V++;A.D++;H.P+=3}
+          else if(m.homeG<m.awayG){A.V++;H.D++;A.P+=3}
+          else{H.E++;A.E++;H.P++;A.P++}
+        }
+      });
+      stats.forEach(s=>s.SG=s.GP-s.GC);
+      return Array.from(stats.values()).sort((a,b)=>b.P-a.P||b.SG-a.SG||b.GP-a.GP||b.V-a.V);
+    };
+
+    const renderTable=()=>{
+      els.tableBody.innerHTML='';
+      computeTable().forEach((r,i)=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td>${i+1}</td><td class='name'>${r.name}</td><td>${r.J}</td><td>${r.V}</td><td>${r.E}</td><td>${r.D}</td><td>${r.GP}</td><td>${r.GC}</td><td>${r.SG}</td><td><b>${r.P}</b></td>`;
+        els.tableBody.appendChild(tr);
+      });
+    };
+
+    renderTeams(); generateMatches(); renderSchedule(); renderTable();
+  </script>
+</body
